@@ -1,0 +1,480 @@
+const MAP = [
+  "###################",
+  "#........#........#",
+  "#o##.###.#.###.##o#",
+  "#.................#",
+  "#.##.#.#####.#.##.#",
+  "#....#...#...#....#",
+  "####.###.#.###.####",
+  "####.#       #.####",
+  "####.# ##-## #.####",
+  "    .  #   #  .    ",
+  "####.# ##### #.####",
+  "####.#       #.####",
+  "#........#........#",
+  "#.##.###.#.###.##.#",
+  "#o.#.....P.....#.o#",
+  "##.#.#.#####.#.#.##",
+  "#....#...#...#....#",
+  "#.######.#.######.#",
+  "#.................#",
+  "###################",
+];
+const W = 19,
+  H = MAP.length,
+  T = 20,
+  S = 2;
+const cv = document.getElementById("c"),
+  ctx = cv.getContext("2d");
+cv.width = W * T * S;
+cv.height = H * T * S;
+ctx.setTransform(S, 0, 0, S, 0, 0);
+const $ = (id) => document.getElementById(id);
+const DIRS = [
+  [1, 0],
+  [0, 1],
+  [-1, 0],
+  [0, -1],
+];
+const CORNERS = {
+  blinky: [17, 0],
+  pinky: [1, 0],
+  inky: [17, 19],
+  clyde: [1, 19],
+};
+let grid,
+  left,
+  score = 0,
+  hi = 0,
+  lives = 3,
+  level = 1,
+  state = "ready",
+  pac,
+  ghosts,
+  fright = 0,
+  combo = 0,
+  t = 0,
+  tm = 0;
+try {
+  hi = +localStorage.getItem("pm-hi") || 0;
+} catch (e) {}
+
+const cell = (c, r) => (MAP[r] ? MAP[r][(c + W) % W] : undefined);
+const walk = (c, r, g) => {
+  const ch = cell(c, r);
+  return ch !== undefined && ch !== "#" && (ch !== "-" || g);
+};
+const isW = (c, r) => r < 0 || r >= H || c < 0 || c >= W || MAP[r][c] === "#";
+const wallPath = new Path2D();
+for (let r = 0; r < H; r++)
+  for (let c = 0; c < W; c++)
+    if (MAP[r][c] === "#") {
+      const x = c * T,
+        y = r * T;
+      if (!isW(c + 1, r)) {
+        wallPath.moveTo(x + T - 2, y);
+        wallPath.lineTo(x + T - 2, y + T);
+      }
+      if (!isW(c - 1, r)) {
+        wallPath.moveTo(x + 2, y);
+        wallPath.lineTo(x + 2, y + T);
+      }
+      if (!isW(c, r + 1)) {
+        wallPath.moveTo(x, y + T - 2);
+        wallPath.lineTo(x + T, y + T - 2);
+      }
+      if (!isW(c, r - 1)) {
+        wallPath.moveTo(x, y + 2);
+        wallPath.lineTo(x + T, y + 2);
+      }
+    }
+
+function initGrid() {
+  grid = MAP.map((r) => [...r.replace("P", ".")]);
+  left = 0;
+  grid.forEach((r) =>
+    r.forEach((ch) => {
+      if (ch === "." || ch === "o") left++;
+    }),
+  );
+}
+const mk = (n, col, c, r, dc, wait, out) => ({
+  n,
+  col,
+  c,
+  r,
+  dc,
+  dr: 0,
+  p: 0,
+  wait,
+  out,
+  eaten: false,
+  vuln: false,
+});
+function spawn() {
+  pac = { c: 9, r: 14, dc: 0, dr: 0, p: 0, want: [0, 0], face: Math.PI };
+  ghosts = [
+    mk("blinky", "#ff3b30", 9, 7, -1, 0, true),
+    mk("pinky", "#ff8ad8", 9, 9, 0, 2, false),
+    mk("inky", "#35e0ff", 8, 9, 0, 5, false),
+    mk("clyde", "#ffa63d", 10, 9, 0, 8, false),
+  ];
+  fright = 0;
+  combo = 0;
+}
+function hud() {
+  $("sc").textContent = score;
+  $("hi").textContent = hi;
+  $("lv").innerHTML = '<i class="life"></i>'.repeat(Math.max(lives, 0));
+}
+function overlay(h, p) {
+  const o = $("ov");
+  o.innerHTML = "<h1>" + h + "</h1><p>" + p + "</p>";
+  o.classList.remove("hide");
+}
+function newGame() {
+  score = 0;
+  lives = 3;
+  level = 1;
+  initGrid();
+  spawn();
+  state = "ready";
+  hud();
+  overlay("Pronto?", "Toque ou use as setas");
+}
+function start() {
+  state = "play";
+  $("ov").classList.add("hide");
+}
+
+function advance(e, sp, choose) {
+  if (!e.dc && !e.dr) {
+    choose(e);
+    if (!e.dc && !e.dr) return;
+  }
+  e.p += sp;
+  while (e.p >= 1) {
+    e.c = (e.c + e.dc + W) % W;
+    e.r += e.dr;
+    e.p -= 1;
+    choose(e);
+    if (!e.dc && !e.dr) {
+      e.p = 0;
+      break;
+    }
+  }
+}
+function pacChoose(e) {
+  const [wc, wr] = e.want;
+  if ((wc || wr) && walk(e.c + wc, e.r + wr, false)) {
+    e.dc = wc;
+    e.dr = wr;
+  } else if (!walk(e.c + e.dc, e.r + e.dr, false)) {
+    e.dc = 0;
+    e.dr = 0;
+  }
+  const ch = grid[e.r][e.c];
+  if (ch === "." || ch === "o") {
+    grid[e.r][e.c] = " ";
+    left--;
+    score += ch === "o" ? 50 : 10;
+    if (ch === "o") {
+      fright = 7;
+      combo = 0;
+      ghosts.forEach((g) => (g.vuln = !g.eaten));
+    }
+    if (score > hi) {
+      hi = score;
+      try {
+        localStorage.setItem("pm-hi", hi);
+      } catch (x) {}
+    }
+    hud();
+    if (!left) {
+      state = "clear";
+      tm = 1.6;
+    }
+  }
+}
+function gChoose(g) {
+  if (!g.out && !g.eaten && g.r <= 7) g.out = true;
+  if (g.eaten && g.c === 9 && g.r === 9) {
+    g.eaten = false;
+    g.out = false;
+    g.vuln = false;
+  }
+  let opts = [];
+  for (const rev of [false, true]) {
+    for (const [dc, dr] of DIRS) {
+      if (!rev && (g.dc || g.dr) && dc === -g.dc && dr === -g.dr) continue;
+      const nc = g.c + dc,
+        nr = g.r + dr;
+      if (!walk(nc, nr, true)) continue;
+      if (cell(nc, nr) === "-" && g.out && !g.eaten) continue;
+      opts.push([dc, dr, (nc + W) % W, nr]);
+    }
+    if (opts.length) break;
+  }
+  if (!opts.length) {
+    g.dc = 0;
+    g.dr = 0;
+    return;
+  }
+  let pick;
+  if (fright > 0 && g.vuln && !g.eaten && g.out) {
+    pick = opts[(Math.random() * opts.length) | 0];
+  } else {
+    let tg;
+    if (g.eaten) tg = [9, 9];
+    else if (!g.out) tg = [9, 7];
+    else if (t % 25 < 5) tg = CORNERS[g.n];
+    else {
+      const px = pac.c,
+        py = pac.r,
+        d = [pac.dc, pac.dr];
+      if (g.n === "blinky") tg = [px, py];
+      else if (g.n === "pinky") tg = [px + 4 * d[0], py + 4 * d[1]];
+      else if (g.n === "inky") {
+        const b = ghosts[0];
+        tg = [2 * (px + 2 * d[0]) - b.c, 2 * (py + 2 * d[1]) - b.r];
+      } else tg = Math.hypot(px - g.c, py - g.r) > 8 ? [px, py] : CORNERS.clyde;
+    }
+    let best = 1e9;
+    for (const o of opts) {
+      const dd = (o[2] - tg[0]) ** 2 + (o[3] - tg[1]) ** 2;
+      if (dd < best) {
+        best = dd;
+        pick = o;
+      }
+    }
+  }
+  g.dc = pick[0];
+  g.dr = pick[1];
+}
+function collide() {
+  const px = pac.c + pac.dc * pac.p,
+    py = pac.r + pac.dr * pac.p;
+  for (const g of ghosts) {
+    if (g.eaten) continue;
+    const gx = g.c + g.dc * g.p,
+      gy = g.r + g.dr * g.p;
+    if (Math.hypot(gx - px, gy - py) < 0.7) {
+      if (fright > 0 && g.vuln) {
+        g.eaten = true;
+        combo++;
+        score += 100 * 2 ** combo;
+        hud();
+      } else {
+        state = "dead";
+        tm = 1.4;
+        return;
+      }
+    }
+  }
+}
+function update(dt) {
+  t += dt;
+  if (state === "play") {
+    if (fright > 0) fright -= dt;
+    advance(pac, 7.5 * dt, pacChoose);
+    if (pac.dc || pac.dr) pac.face = Math.atan2(pac.dr, pac.dc);
+    for (const g of ghosts) {
+      if (g.wait > 0) {
+        g.wait -= dt;
+        continue;
+      }
+      const sp = g.eaten
+        ? 12
+        : fright > 0 && g.vuln
+          ? 4
+          : 5.8 + 0.3 * Math.min(level, 6);
+      advance(g, sp * dt, gChoose);
+    }
+    if (state === "play") collide();
+  } else if (state === "dead") {
+    tm -= dt;
+    if (tm <= 0) {
+      lives--;
+      hud();
+      if (lives <= 0) {
+        state = "over";
+        overlay("Fim de jogo", "Toque para jogar de novo");
+      } else {
+        spawn();
+        state = "ready";
+        overlay("Pronto?", "Toque ou use as setas");
+      }
+    }
+  } else if (state === "clear") {
+    tm -= dt;
+    if (tm <= 0) {
+      level++;
+      initGrid();
+      spawn();
+      state = "ready";
+      overlay("Fase " + level, "Toque ou use as setas");
+    }
+  }
+}
+
+function drawGhost(g, x, y) {
+  const frightened = fright > 0 && g.vuln && !g.eaten;
+  if (!g.eaten) {
+    ctx.fillStyle = frightened
+      ? fright < 2 && Math.floor(t * 6) % 2
+        ? "#fff"
+        : "#2a3bff"
+      : g.col;
+    ctx.beginPath();
+    ctx.arc(x, y - 1, 8, Math.PI, 0);
+    ctx.lineTo(x + 8, y + 8);
+    for (let i = 0; i < 4; i++) {
+      ctx.lineTo(x + 8 - i * 4 - 2, y + (i % 2 ? 8 : 5));
+      ctx.lineTo(x + 8 - i * 4 - 4, y + 8);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+  if (frightened) {
+    ctx.fillStyle = fright < 2 && Math.floor(t * 6) % 2 ? "#e33" : "#ffd7a8";
+    ctx.fillRect(x - 4, y - 3, 2, 2);
+    ctx.fillRect(x + 2, y - 3, 2, 2);
+  } else {
+    ctx.fillStyle = "#fff";
+    for (const s of [-3.5, 3.5]) {
+      ctx.beginPath();
+      ctx.arc(x + s, y - 2, 2.8, 0, 7);
+      ctx.fill();
+    }
+    ctx.fillStyle = "#16206b";
+    for (const s of [-3.5, 3.5]) {
+      ctx.beginPath();
+      ctx.arc(x + s + g.dc * 1.4, y - 2 + g.dr * 1.4, 1.4, 0, 7);
+      ctx.fill();
+    }
+  }
+}
+function draw() {
+  ctx.fillStyle = "#07061a";
+  ctx.fillRect(0, 0, W * T, H * T);
+  const flash = state === "clear" && Math.floor(t * 6) % 2;
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+  ctx.strokeStyle = flash ? "#fff" : "#3b4cff";
+  ctx.stroke(wallPath);
+  ctx.strokeStyle = "#ff8ad8";
+  ctx.beginPath();
+  ctx.moveTo(9 * T + 2, 8 * T + T / 2);
+  ctx.lineTo(10 * T - 2, 8 * T + T / 2);
+  ctx.stroke();
+  ctx.fillStyle = "#ffd9a0";
+  for (let r = 0; r < H; r++)
+    for (let c = 0; c < W; c++) {
+      const ch = grid[r][c];
+      if (ch === ".") {
+        ctx.fillRect(c * T + 8, r * T + 8, 4, 4);
+      } else if (ch === "o" && Math.floor(t * 4) % 2 === 0) {
+        ctx.beginPath();
+        ctx.arc(c * T + 10, r * T + 10, 6, 0, 7);
+        ctx.fill();
+      }
+    }
+  const pp = (e) => [
+    (e.c + e.dc * e.p + 0.5) * T,
+    (e.r + e.dr * e.p + 0.5) * T,
+  ];
+  for (const g of ghosts) {
+    const [x, y] = pp(g);
+    drawGhost(g, x, y);
+  }
+  const [x, y] = pp(pac);
+  let open = pac.dc || pac.dr ? Math.abs(Math.sin(t * 14)) * 0.7 : 0.35,
+    a = pac.face;
+  if (state === "dead") {
+    open = Math.min((1.4 - tm) / 1.4, 1) * Math.PI;
+    a = -Math.PI / 2;
+  }
+  if (state !== "dead" || tm > 0) {
+    ctx.fillStyle = "#ffd400";
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.arc(x, y, 8.5, a + open, a + Math.PI * 2 - open);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+let last = 0;
+function loop(ts) {
+  const dt = Math.min((ts - last) / 1000 || 0, 0.05);
+  last = ts;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+function setDir(dc, dr) {
+  if (state === "over") {
+    newGame();
+    return;
+  }
+  if (state === "ready") start();
+  if (state !== "play") return;
+  pac.want = [dc, dr];
+  if (dc === -pac.dc && dr === -pac.dr) {
+    pac.c = (pac.c + pac.dc + W) % W;
+    pac.r += pac.dr;
+    pac.dc = dc;
+    pac.dr = dr;
+    pac.p = 1 - pac.p;
+  }
+}
+addEventListener("keydown", (e) => {
+  const m = {
+    ArrowRight: [1, 0],
+    ArrowLeft: [-1, 0],
+    ArrowDown: [0, 1],
+    ArrowUp: [0, -1],
+    d: [1, 0],
+    a: [-1, 0],
+    s: [0, 1],
+    w: [0, -1],
+  }[e.key];
+  if (m) {
+    e.preventDefault();
+    setDir(...m);
+  }
+});
+document.querySelectorAll(".pad button").forEach((b) => {
+  b.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    setDir(...b.dataset.d.split(",").map(Number));
+  });
+});
+let sx, sy;
+const scr = $("screen");
+scr.addEventListener(
+  "touchstart",
+  (e) => {
+    sx = e.touches[0].clientX;
+    sy = e.touches[0].clientY;
+  },
+  { passive: true },
+);
+scr.addEventListener("touchend", (e) => {
+  const dx = e.changedTouches[0].clientX - sx,
+    dy = e.changedTouches[0].clientY - sy;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) {
+    if (state === "over") newGame();
+    else if (state === "ready") start();
+    return;
+  }
+  if (Math.abs(dx) > Math.abs(dy)) setDir(dx > 0 ? 1 : -1, 0);
+  else setDir(0, dy > 0 ? 1 : -1);
+});
+scr.addEventListener("click", () => {
+  if (state === "over") newGame();
+  else if (state === "ready") start();
+});
+
+newGame();
+requestAnimationFrame(loop);

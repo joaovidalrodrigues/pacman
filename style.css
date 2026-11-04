@@ -1,0 +1,156 @@
+/* Gerado a partir de style.scss */
+:root {
+  --bg: #e8e5f7;
+  --ink: #1b1840;
+  --muted: #5d5994;
+  --btn: #1b1840;
+  --btn-ink: #ffd400;
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b0a1f;
+    --ink: #f3f0ff;
+    --muted: #8d89c4;
+    --btn: #211f4d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b0a1f;
+  --ink: #f3f0ff;
+  --muted: #8d89c4;
+  --btn: #211f4d;
+  color-scheme: dark;
+}
+html,
+body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Press Start 2P", ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+.game {
+  width: min(100vw - 24px, 420px);
+  padding: 14px 0 18px;
+}
+.game .hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 12px;
+}
+.game .hud div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.game .hud small {
+  color: var(--muted);
+  font-size: 8px;
+}
+.game .hud b {
+  font-weight: 400;
+  font-size: 14px;
+}
+.game .lives {
+  flex-direction: row !important;
+  gap: 6px !important;
+}
+.game .life {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: conic-gradient(#ffd400 0 45deg, transparent 0 135deg, #ffd400 0);
+}
+.game .screen {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #07061a;
+  line-height: 0;
+}
+.game canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.game .ov {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+  line-height: 1.6;
+  background: rgba(7, 6, 26, 0.72);
+  color: #f3f0ff;
+}
+.game .ov h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 400;
+  color: #ffd400;
+}
+.game .ov p {
+  margin: 0;
+  font-size: 9px;
+}
+.game .ov.hide {
+  display: none;
+}
+.pad {
+  display: grid;
+  grid-template-columns: repeat(3, 64px);
+  grid-template-rows: repeat(2, 56px);
+  gap: 8px;
+  justify-content: center;
+  margin-top: 18px;
+}
+.pad button {
+  border: 0;
+  border-radius: 12px;
+  background: var(--btn);
+  color: var(--btn-ink);
+  font: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+.pad button:active {
+  transform: scale(0.94);
+}
+.pad button:focus-visible {
+  outline: 3px solid #ffd400;
+  outline-offset: 2px;
+}
+.pad .u {
+  grid-column: 2;
+  grid-row: 1;
+}
+.pad .l {
+  grid-column: 1;
+  grid-row: 2;
+}
+.pad .d {
+  grid-column: 2;
+  grid-row: 2;
+}
+.pad .r {
+  grid-column: 3;
+  grid-row: 2;
+}

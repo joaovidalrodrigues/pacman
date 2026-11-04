@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Pac-Man</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="game">
+      <header class="hud">
+        <div><small>Pontos</small><b id="sc">0</b></div>
+        <div><small>Recorde</small><b id="hi">0</b></div>
+        <div id="lv" class="lives" aria-label="Vidas"></div>
+      </header>
+      <div class="screen" id="screen">
+        <canvas id="c"></canvas>
+        <div class="ov" id="ov">
+          <h1>Pac-Man</h1>
+          <p>Toque ou use as setas</p>
+        </div>
+      </div>
+      <nav class="pad" aria-label="Controles">
+        <button class="u" data-d="0,-1" aria-label="Cima">▲</button>
+        <button class="l" data-d="-1,0" aria-label="Esquerda">◀</button>
+        <button class="d" data-d="0,1" aria-label="Baixo">▼</button>
+        <button class="r" data-d="1,0" aria-label="Direita">▶</button>
+      </nav>
+    </main>
+    <script src="game.js"></script>
+  </body>
+</html>
